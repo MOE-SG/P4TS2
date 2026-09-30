@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P4/SP4 Data Checker</title>
+<meta name="description" content="Checks P4/SP4 test CSV data against limit files. Runs entirely in the browser.">
+<meta name="theme-color" content="#2a78d6">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="P4/SP4 Checker">
+<style>
+:root{
+  color-scheme: light;
+  --bg:#f4f4f2; --surface:#fcfcfb; --surface-2:#f0efec; --border:#dcdbd6;
+  --text:#0b0b0b; --text-2:#52514e; --muted:#7a7974;
+  --accent:#2a78d6; --accent-ink:#ffffff;
+  --pass-bg:#dff3e4; --pass-ink:#12602c; --fail-bg:#fbe0e0; --fail-ink:#9b1c1c; --na-ink:#7a7974;
+  --warn-bg:#fff4d6; --warn-ink:#7a5200;
+  --grid:#e6e5e0; --axis:#9a9993; --limit:#52514e;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#121211; --surface:#1a1a19; --surface-2:#242422; --border:#383835;
+    --text:#ffffff; --text-2:#c3c2b7; --muted:#8f8e86;
+    --accent:#3987e5;
+    --pass-bg:#173a22; --pass-ink:#9be3ae; --fail-bg:#4a1d1d; --fail-ink:#ffb4b4;
+    --warn-bg:#3d3113; --warn-ink:#f3d58a;
+    --grid:#2c2c2a; --axis:#6b6a64; --limit:#c3c2b7;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#121211; --surface:#1a1a19; --surface-2:#242422; --border:#383835;
+  --text:#ffffff; --text-2:#c3c2b7; --muted:#8f8e86;
+  --accent:#3987e5;
+  --pass-bg:#173a22; --pass-ink:#9be3ae; --fail-bg:#4a1d1d; --fail-ink:#ffb4b4;
+  --warn-bg:#3d3113; --warn-ink:#f3d58a;
+  --grid:#2c2c2a; --axis:#6b6a64; --limit:#c3c2b7;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+header.top{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
+header.top h1{font-size:16px;margin:0;font-weight:650}
+header.top .sp{flex:1}
+button,select,input[type=file]{font:inherit;color:inherit}
+button{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:var(--axis)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+select{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 6px;width:100%}
+.layout{display:grid;grid-template-columns:minmax(340px,420px) minmax(0,1fr);gap:16px;padding:16px;align-items:start}
+aside{display:flex;flex-direction:column;gap:12px;position:sticky;top:58px;max-height:calc(100vh - 74px);overflow:auto}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px}
+.card h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-2)}
+label.f{display:block;font-size:12px;color:var(--text-2);margin:8px 0 3px}
+.drop{border:2px dashed var(--border);border-radius:8px;padding:16px;text-align:center;color:var(--text-2);cursor:pointer}
+.drop.over{border-color:var(--accent);color:var(--text)}
+.drop b{color:var(--text)}
+.status{font-size:12px;margin-top:8px;padding:6px 8px;border-radius:6px}
+.status.ok{background:var(--pass-bg);color:var(--pass-ink)}
+.status.err{background:var(--fail-bg);color:var(--fail-ink)}
+.status.info{background:var(--surface-2);color:var(--text-2)}
+main{min-width:0;display:flex;flex-direction:column;gap:16px}
+.intro ol{margin:6px 0 0 18px;padding:0}
+.intro li{margin:4px 0}
+.meta{display:flex;flex-wrap:wrap;gap:6px 20px;font-size:13px}
+.meta span{color:var(--text-2)}
+.meta b{font-weight:600}
+.section h3{margin:0 0 2px;font-size:15px}
+.section .sub{color:var(--text-2);font-size:12px;margin-bottom:8px}
+.badge{display:inline-block;font-size:11px;font-weight:650;padding:1px 7px;border-radius:10px;margin-left:6px;vertical-align:1px;text-transform:uppercase}
+.badge.pass{background:var(--pass-bg);color:var(--pass-ink)}
+.badge.fail{background:var(--fail-bg);color:var(--fail-ink)}
+.badge.na{background:var(--surface-2);color:var(--na-ink)}
+.badge.err{background:var(--warn-bg);color:var(--warn-ink)}
+.tw{overflow-x:auto}
+table.t{border-collapse:collapse;font-size:12px;margin:0 auto 4px;font-variant-numeric:tabular-nums}
+table.t caption{caption-side:top;font-weight:600;padding:4px;text-align:left}
+table.t th,table.t td{border:1px solid var(--border);padding:2px 6px;text-align:center;white-space:nowrap}
+table.t th{background:var(--surface-2);font-weight:600;text-transform:uppercase;font-size:11px}
+table.t tbody tr:hover td{filter:brightness(0.97)}
+tr.pass td{background:var(--pass-bg)}
+tr.fail td{background:var(--fail-bg)}
+td.pass{background:var(--pass-bg);color:var(--pass-ink);font-weight:600}
+td.fail{background:var(--fail-bg);color:var(--fail-ink);font-weight:600}
+td.na{color:var(--na-ink)}
+td.err{background:var(--warn-bg);color:var(--warn-ink)}
+#summary td.click{cursor:pointer}
+#summary td.click:hover{outline:2px solid var(--accent);outline-offset:-2px}
+#summary th.row{text-align:left;text-transform:none;font-size:12px}
+.chart{position:relative;margin-top:8px}
+.chart svg{display:block;width:100%;height:auto}
+.chart svg text{fill:var(--text-2);font-size:11px}
+.chart svg .title{fill:var(--text);font-size:12px;font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--text-2);margin:4px 0 0 4px}
+.legend i{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+.legend i.dash{border-top-style:dashed}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);white-space:nowrap;display:none;z-index:3}
+.tip .sw{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+.charts2{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:12px}
+.muted{color:var(--muted)}
+a{color:var(--accent)}
+.sample{font-size:12px;color:var(--text-2);margin-top:8px;text-align:center}
+button.link{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer;font-size:inherit}
+.row-btns{display:flex;gap:8px;margin-top:10px}
+.row-btns > *{flex:1}
+@media (max-width: 860px){
+  .layout{grid-template-columns:1fr;padding:12px 16px}
+  aside{position:static;max-height:none}
+  .charts2{grid-template-columns:1fr}
+}
+@media print{
+  @page{size:A4;margin:10mm}
+  body{background:#fff;color:#000}
+  header.top button, #loadCard, #viewCard .row-btns, #viewCard label, #viewCard select{display:none!important}
+  header.top{position:static;border:0}
+  .layout{display:block;padding:0}
+  aside{position:static;max-height:none;overflow:visible}
+  .card{border:0;padding:4px 0;break-inside:avoid}
+  .section{break-inside:avoid}
+  .intro{display:none}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>P4/SP4 Data Checker</h1>
+  <span class="sp"></span>
+  <button id="installBtn" hidden title="Install as an app on this device">Install app</button>
+  <button id="themeBtn" title="Toggle light/dark">◐</button>
+  <button id="printBtn" title="Print or save the report as PDF">Print report</button>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="card" id="loadCard">
+    <h2>1 · Limits</h2>
+    <select id="limitSel"></select>
+    <input type="file" id="limitFile" accept=".csv" hidden>
+    <div id="limitStatus" class="status info">Loading limits…</div>
+
+    <h2 style="margin-top:14px">2 · Test data</h2>
+    <div class="drop" id="drop"><b>Drop CSV here</b><br>or click to browse</div>
+    <input type="file" id="dataFile" accept=".csv" hidden>
+    <div class="sample">No data handy? <button type="button" id="sampleBtn" class="link">Try the sample</button> · <a href="sample_data.csv" download>Download sample CSV</a></div>
+    <div id="dataStatus"></div>
+  </div>
+
+  <div class="card" id="summaryCard" hidden>
+    <h2>Overall result</h2>
+    <div class="tw" id="summary"></div>
+    <div class="muted" style="font-size:11px;margin-top:4px">Click a cell to open that test.</div>
+  </div>
+
+  <div class="card" id="viewCard" hidden>
+    <h2>View</h2>
+    <label class="f" for="tempSel">Segment / temperature</label>
+    <select id="tempSel"></select>
+    <label class="f" for="testSel">Test</label>
+    <select id="testSel"></select>
+    <div class="row-btns">
+      <button class="primary" id="showBtn">Show</button>
+    </div>
+  </div>
+</aside>
+
+<main id="main">
+  <div class="card intro" id="intro">
+    <h2>How to use</h2>
+    <ol>
+      <li>The limit file loads automatically from GitHub. Pick another version, or load your own limit CSV, from the <b>Limits</b> list.</li>
+      <li>Drag the test data CSV onto the drop box, or click it to browse. A pass/fail summary for the last run appears on the left.</li>
+      <li>Pick a segment and test, then click <b>Show</b> to see the data tables and plots. Click any cell in the summary to jump to that test.</li>
+      <li>To save the report, click <b>Print report</b> and pick "Save as PDF".</li>
+    </ol>
+    <p style="margin:10px 0 0">Want to see how it works first? <a href="sample_data.csv" download>Download the sample data</a> (made-up values), or click <b>Try the sample</b> on the left.</p>
+    <p class="muted" style="margin:10px 0 0">Everything runs in your browser. The data file is never uploaded anywhere. After the first visit the app also works offline, and you can install it with <b>Install app</b> (Chrome/Edge) or "Add to Home Screen" (phones).</p>
+  </div>
+  <div id="report"></div>
+</main>
+</div>
+
+<!-- ================= CORE LOGIC (no DOM) ================= -->
+<script id="core">
+(function(global){
+"use strict";
+
+const LIMIT_BASE = "https://raw.githubusercontent.com/morrise/limit/main/";
+const LIMIT_FILES = [
+  {file:"EwrSolarSetLimit_Apr2023.csv", label:"Apr 2023"},
+  {file:"EwrSolarSetLimit_Mar2022.csv", label:"Mar 2022"},
+  {file:"EwrSolarSetLimit_TrialMar2022.csv", label:"Mar 2022 (trial)"},
+  {file:"EwrSolarSetLimit_Jan2022.csv", label:"Jan 2022"},
+];
+
+// Per-test settings, ported from datafileconfig.py (all names lower-cased here).
+const C = (o)=>({refNorm:[],norm:[],lookup:null,display:[],transpose:false,plot:[],yrange:[],xlabel:"",xreverse:false,...o});
+const PHASE_N = {refNorm:["exphase","stphase"],norm:["normalizedexphase","normalizedstphase"]};
+const RMS_N   = {refNorm:["nearrms","farrms"],norm:["correctednearrms","correctedfarrms"]};
+const PLOT_PH = ["normalizedexphase","normalizedstphase"];
+const PLOT_RMS= ["correctednearrms","correctedfarrms"];
+const TESTS = {
+  1: C({display:["sbv","targsbv","time","date","targtemp","oventemp","tooltemp","subbusv","subbusi","3.6v","11v","6.8v","dac_0.0v","dac_1.4v","dac_2.2v","dac_2.8v","dac_4.3v","result"],transpose:true}),
+  2: C({...PHASE_N,lookup:2000000,display:["infrequency","exphase","stphase","nearagc","faragc","normalizedexphase","normalizedstphase","result"],plot:PLOT_PH,yrange:[-0.5,0.5],xlabel:"infrequency"}),
+  3: C({...PHASE_N,lookup:1000000,display:["infrequency","nearagc","faragc","nearrms","farrms","normalizedexphase","normalizedstphase","result"],plot:PLOT_PH,yrange:[-0.5,0.5],xlabel:"infrequency"}),
+  4: C({...PHASE_N,lookup:-65,display:["infrequency","nearagc","faragc","nearrms","farrms","normalizedexphase","normalizedstphase","result"],plot:PLOT_PH,yrange:[-1,1],xlabel:"inamp",xreverse:true}),
+  5: C({...PHASE_N,lookup:-75,display:["inamp","exphase","stphase","nearagc","faragc","normalizedexphase","normalizedstphase","result"],plot:PLOT_PH,yrange:[-1,1],xlabel:"inamp",xreverse:true}),
+  6: C({...RMS_N,lookup:-65,display:["inamp","nearrms","farrms","correctednearrms","correctedfarrms","result"],plot:PLOT_RMS,yrange:[-1,1],xlabel:"inamp",xreverse:true}),
+  7: C({...RMS_N,lookup:-75,display:["inamp","nearrms","farrms","correctednearrms","correctedfarrms","result"],plot:PLOT_RMS,yrange:[-1,1],xlabel:"inamp",xreverse:true}),
+  8: C({...PHASE_N,lookup:0,display:["inphase","exphase","stphase","normalizedexphase","normalizedstphase","result"],plot:PLOT_PH,yrange:[-1,1],xlabel:"inphase"}),
+  9: C({...PHASE_N,lookup:0,display:["inphase","exphase","stphase","normalizedexphase","normalizedstphase","result"],plot:PLOT_PH,yrange:[-1,1],xlabel:"inphase"}),
+  10:C({...PHASE_N,lookup:2000000,display:["infrequency","exphase","stphase","result"],yrange:[-0.5,0.5],xlabel:"infrequency"}),
+  11:C({...PHASE_N,lookup:1000000,display:["infrequency","exphase","stphase","result"],yrange:[-0.5,0.5],xlabel:"infrequency"}),
+  12:C({...PHASE_N,lookup:2000000,display:["infrequency","nearagc","faragc","result"],yrange:[-0.5,0.5],xlabel:"infrequency"}),
+  13:C({...PHASE_N,lookup:1000000,display:["infrequency","nearagc","faragc","result"],yrange:[-0.5,0.5],xlabel:"infrequency"}),
+  14:C({...PHASE_N,lookup:-65,display:["infrequency","nearagc","faragc","nearrms","farrms","result"],yrange:[-1,1],xlabel:"inamp",xreverse:true}),
+  15:C({...PHASE_N,lookup:-75,display:["infrequency","nearagc","faragc","nearrms","farrms","result"],plot:PLOT_PH,yrange:[-1,1],xlabel:"inamp",xreverse:true}),
+};
+
+const DATA_COLUMNS = ["RunNumber","Mother_SN","Daugther_SN","Cycle","Segment","TestType","TestID","ELS","SBV","TargSBV","Time","Date","TargTemp","OvenTemp","ToolTemp","SubbusV","SubbusI","3.6V","11V","6.8V","DAC_0.0V","DAC_1.4V","DAC_2.2V","DAC_2.8V","DAC_4.3V","InFrequency","InAmp","InPhase","ExPhase","StPhase","NearAGC","FarAGC","NearRMS","FarRMS"];
+const LIMIT_COLUMNS = ["targtemp","testtype","testid","refvalue","refcol","checkcol","high","low","testname"];
+
+// ---------- CSV ----------
+function parseCSV(text){
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const rows=[]; let row=[], f="", q=false;
+  for (let i=0;i<text.length;i++){
+    const c=text[i];
+    if (q){
+      if (c === '"'){ if (text[i+1] === '"'){ f+='"'; i++; } else q=false; }
+      else f+=c;
+    } else if (c === '"') q=true;
+    else if (c === ','){ row.push(f); f=""; }
+    else if (c === '\n' || c === '\r'){
+      if (c === '\r' && text[i+1] === '\n') i++;
+      row.push(f); f=""; rows.push(row); row=[];
+    } else f+=c;
+  }
+  if (f !== "" || row.length){ row.push(f); rows.push(row); }
+  return rows.filter(r => !(r.length === 1 && r[0].trim() === ""));
+}
+function num(s){
+  if (s === undefined || s === null) return NaN;
+  const t = String(s).trim();
+  if (t === "") return NaN;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : NaN;
+}
+// numpy.round(x, 3): rint(x*1000)/1000 with round-half-to-even
+function round3(x){
+  if (!Number.isFinite(x)) return x;
+  const y = x*1000, fl = Math.floor(y), d = y - fl;
+  let r;
+  if (d > 0.5) r = fl+1; else if (d < 0.5) r = fl; else r = (fl % 2 === 0) ? fl : fl+1;
+  return r/1000;
+}
+// A stable key for things like segment / run numbers that may be "1" or "1.0"
+function keyOf(s){ const n = num(s); return Number.isNaN(n) ? String(s ?? "").trim() : String(n); }
+function uniq(arr, keyFn = x=>x){ const seen=new Set(), out=[]; for (const x of arr){ const k=keyFn(x); if(!seen.has(k)){ seen.add(k); out.push(x);} } return out; }
+
+// ---------- Limits ----------
+function loadLimits(text){
+  const rows = parseCSV(text);
+  if (rows.length < 2) throw new Error("Limit file is empty.");
+  const hdr = rows[0].map(h => h.trim().toLowerCase());
+  if (!hdr.every(h => LIMIT_COLUMNS.includes(h)) || !LIMIT_COLUMNS.every(h => hdr.includes(h)))
+    throw new Error("Limit columns were not found! Expected: " + LIMIT_COLUMNS.join(", "));
+  const ix = Object.fromEntries(hdr.map((h,i)=>[h,i]));
+  const lim = [];
+  for (const r of rows.slice(1)){
+    if (r.every(v => v.trim()==="")) continue;
+    lim.push({
+      targtemp:num(r[ix.targtemp]), testtype:num(r[ix.testtype]), testid:num(r[ix.testid]),
+      refvalue:num(r[ix.refvalue]), refcol:String(r[ix.refcol]??"").trim().toLowerCase(),
+      checkcol:String(r[ix.checkcol]??"").trim().toLowerCase(),
+      high:num(r[ix.high]), low:num(r[ix.low]), testname:String(r[ix.testname]??"").trim()
+    });
+  }
+  return lim;
+}
+
+// ---------- Data ----------
+function loadData(text){
+  const rows = parseCSV(text);
+  const hdrRaw = (rows[0]||[]).map(h => h.trim());
+  const body = rows.slice(1);
+  const missing = DATA_COLUMNS.filter(c => !hdrRaw.includes(c));
+  if (hdrRaw.length !== 34 || body.length <= 2 || missing.length)
+    throw new Error("CSV structure not recognized, or the file has no header row. Please verify your test data." +
+      (missing.length ? " Missing columns: " + missing.join(", ") : (hdrRaw.length!==34 ? ` Found ${hdrRaw.length} columns, expected 34.` : "")));
+  const hdr = hdrRaw.map(h => h.toLowerCase());
+  let skipped = 0;
+  const out = [];
+  for (const r of body){
+    if (r.length > hdr.length){ skipped++; continue; }  // same as pandas on_bad_lines='warn'
+    const raw = {}, v = {};
+    hdr.forEach((h,i) => { raw[h] = r[i] ?? ""; v[h] = num(r[i]); });
+    out.push({raw, v});
+  }
+  return {columns: hdr, rows: out, skipped};
+}
+
+// ---------- Analysis ----------
+function prepare(limits, data){
+  const rows = data.rows;
+  const runs = uniq(rows.map(r => keyOf(r.raw.runnumber)));
+  const lastRun = runs[runs.length-1];
+  const run = rows.filter(r => keyOf(r.raw.runnumber) === lastRun);
+
+  const limitTemps = new Set(limits.map(l => l.targtemp));
+  const limitIds   = new Set(limits.map(l => l.testid));
+  const dataTemps  = uniq(rows.map(r => r.v.targtemp)).filter(t => !Number.isNaN(t));
+  const dataIds    = uniq(run.map(r => r.v.testid));
+  const tempsCan   = dataTemps.filter(t => limitTemps.has(t));
+  const idsCan     = dataIds.filter(t => limitIds.has(t));
+
+  const segTemp = uniq(run.map(r => ({seg: keyOf(r.raw.segment), temp: r.v.targtemp})), x => x.seg + "|" + x.temp);
+  const segmentsCan = segTemp.filter(s => tempsCan.includes(s.temp));
+  const nameId = uniq(limits.map(l => ({name:l.testname, id:l.testid})), x => x.name + "|" + x.id);
+  const testnames = uniq(nameId.filter(x => idsCan.includes(x.id)).map(x => x.name));
+  const idToType = {}; for (const l of limits) if (!(l.testid in idToType)) idToType[l.testid] = l.testtype;
+  const nameToId = {}; for (const x of nameId) if (!(x.name in nameToId)) nameToId[x.name] = x.id;
+
+  const first = run[0] || rows[0];
+  return {
+    limits, run, lastRun, runs, segTemp, segmentsCan, testnames, idToType, nameToId,
+    tempsCan, idsCan,
+    info: first ? {mother:first.raw.mother_sn, daughter:first.raw.daugther_sn, cycle:first.raw.cycle} : {}
+  };
+}
+
+function getThisData(ctx, seg, testid, testtype){
+  const tid = testid > 9 ? testid - 7 : testid;
+  const rows = ctx.run.filter(r => keyOf(r.raw.segment) === seg && r.v.testid === tid && r.v.testtype === testtype)
+                      .map(r => ({raw:{...r.raw}, v:{...r.v}}));
+  const cfg = TESTS[testid];
+  if (!cfg || !cfg.norm.length || !(testid >= 2 && testid <= 9)) return rows;
+  const x = cfg.xlabel, L = cfg.lookup;
+  const center = rows.find(r => r.v[x] === L);
+  if (!center) throw new Error(`Reference point ${x} = ${L} not found in the data, so values can't be normalized.`);
+  cfg.refNorm.forEach((rc, i) => {
+    const nc = cfg.norm[i], c0 = center.v[rc];
+    for (const r of rows){
+      let val;
+      if (testid <= 5)      val = r.v[rc] - c0;
+      else if (testid <= 7) val = (r.v[x] - L) - r.v[rc] + c0;
+      else                  val = r.v[rc] - c0 - (r.v[x] - L);
+      r.v[nc] = round3(val);
+      r.raw[nc] = Number.isFinite(r.v[nc]) ? String(r.v[nc]) : "";
+    }
+  });
+  return rows;
+}
+
+// Check every limit row against the data. A value passes when low < value <= high.
+function checkData(lim, rows){
+  const refcol = lim[0].refcol;
+  const checkcols = uniq(lim.map(l => l.checkcol));
+  const perRef = new Map();  // refvalue -> bool
+  const fails = [];
+  for (const cc of checkcols){
+    const L = lim.filter(l => l.checkcol === cc);
+    if (L.length > rows.length) throw new Error(`Data set is smaller than the limit set for ${cc} (${rows.length} rows vs ${L.length} limits).`);
+    for (const l of L){
+      const matches = rows.filter(r => r.v[refcol] === l.refvalue);
+      const vals = matches.length ? matches.map(r => r.v[cc]) : [NaN];
+      for (const val of vals){
+        const ok = val <= l.high && val > l.low;
+        perRef.set(l.refvalue, (perRef.has(l.refvalue) ? perRef.get(l.refvalue) : true) && ok);
+        if (!ok) fails.push({check:cc, refcol, refvalue:l.refvalue, value:val, low:l.low, high:l.high});
+      }
+    }
+  }
+  const pass = [...perRef.values()].every(Boolean);
+  return {pass, perRef, fails, refcol, checkcols};
+}
+
+function evaluate(ctx, testname, seg){
+  const testid = ctx.nameToId[testname];
+  const st = ctx.segTemp.find(s => s.seg === seg);
+  const temp = st ? st.temp : NaN;
+  const testtype = ctx.idToType[testid];
+  const base = {testname, seg, temp, testid};
+  const lim = ctx.limits.filter(l => l.testname === testname && l.targtemp === temp);
+  if (!lim.length) return {...base, status:"na", message:`No limits for ${testname} at ${temp} °C.`};
+  let rows;
+  try {
+    rows = getThisData(ctx, seg, testid, testtype);
+    const chk = checkData(lim, rows);
+    return {...base, status: chk.pass ? "pass" : "fail", rows, lim, ...chk};
+  } catch(e){
+    return {...base, status:"error", message:e.message, rows: rows || []};
+  }
+}
+
+function summarize(ctx){
+  const res = {};
+  for (const s of ctx.segmentsCan) for (const t of ctx.testnames) res[t+"|"+s.seg] = evaluate(ctx, t, s.seg);
+  return res;
+}
+
+// Table model for one evaluated test
+function displayModel(ev){
+  const cfg = TESTS[ev.testid];
+  const refcol = ev.refcol;
+  const cols = cfg.display.filter(c => c !== refcol);
+  const rows = ev.rows.map(r => {
+    const ref = r.v[refcol];
+    const res = ev.perRef && ev.perRef.has(ref) ? (ev.perRef.get(ref) ? "pass" : "fail") : "";
+    return {ref: r.raw[refcol], refNum: ref, cells: cols.map(c => c === "result" ? res : (r.raw[c] ?? "")), result: res};
+  });
+  return {refcol, cols, rows, transpose: cfg.transpose};
+}
+
+global.Checker = {LIMIT_BASE, LIMIT_FILES, TESTS, parseCSV, loadLimits, loadData, prepare, evaluate, summarize, displayModel, round3, keyOf, num};
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+
+<!-- ================= UI ================= -->
+<script>
+(function(){
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = v => Number.isFinite(v) ? String(+v.toFixed(4)) : "—";
+const state = {limits:null, limitName:"", data:null, fileName:"", ctx:null, summary:null};
+
+// ---- theme ----
+$("#themeBtn").onclick = () => {
+  const cur = document.documentElement.dataset.theme ||
+    (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  document.documentElement.dataset.theme = cur === "dark" ? "light" : "dark";
+  (state.charts||[]).forEach(c => drawChart(document.getElementById(c.id), c));  // redraw with new colors
+};
+$("#printBtn").onclick = () => window.print();
+
+// ---- limits ----
+const limitSel = $("#limitSel");
+Checker.LIMIT_FILES.forEach((f,i) => limitSel.add(new Option(f.label + (i===0?" (default)":""), f.file)));
+const labelOf = f => (Checker.LIMIT_FILES.find(x => x.file === f) || {label:f}).label;
+limitSel.add(new Option("Load a limit file from my computer…", "__local"));
+function setStatus(el, cls, html){ el.className = "status " + cls; el.innerHTML = html; }
+
+async function loadRemoteLimits(name){
+  setStatus($("#limitStatus"), "info", "Loading " + esc(labelOf(name)) + "…");
+  try {
+    const r = await fetch(Checker.LIMIT_BASE + name, {cache:"no-cache"});
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    applyLimits(await r.text(), labelOf(name));
+  } catch(e){
+    state.limits = null;
+    setStatus($("#limitStatus"), "err", "Couldn't download the limit file (" + esc(e.message) + "). Choose <b>Load a limit file from my computer…</b> instead.");
+  }
+}
+function applyLimits(text, name){
+  try {
+    state.limits = Checker.loadLimits(text); state.limitName = name;
+    const temps = [...new Set(state.limits.map(l=>l.targtemp))].sort((a,b)=>a-b);
+    setStatus($("#limitStatus"), "ok", `<b>${esc(name)}</b> limits loaded: ${state.limits.length} rows, temperatures ${temps.join(", ")} °C.`);
+    if (state.data) runAnalysis();
+  } catch(e){
+    state.limits = null;
+    setStatus($("#limitStatus"), "err", esc(e.message));
+  }
+}
+let lastRemote = Checker.LIMIT_FILES[0].file;
+limitSel.onchange = () => {
+  if (limitSel.value === "__local"){ $("#limitFile").click(); limitSel.value = lastRemote; return; }
+  lastRemote = limitSel.value; loadRemoteLimits(limitSel.value);
+};
+$("#limitFile").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  applyLimits(await f.text(), f.name + " (local)");
+  e.target.value = "";
+};
+
+// ---- data ----
+const drop = $("#drop");
+drop.onclick = () => $("#dataFile").click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); const f = e.dataTransfer.files[0]; if (f) readData(f); };
+$("#dataFile").onchange = e => { const f = e.target.files[0]; if (f) readData(f); e.target.value = ""; };
+
+async function readData(file){
+  const st = $("#dataStatus");
+  try {
+    state.data = Checker.loadData(await file.text());
+    state.fileName = file.name;
+    setStatus(st, "ok", `<b>${esc(file.name)}</b> is recognized (${state.data.rows.length} rows` +
+      (state.data.skipped ? `, ${state.data.skipped} malformed rows skipped` : "") + ").");
+    runAnalysis();
+  } catch(e){
+    state.data = null;
+    setStatus(st, "err", esc(e.message));
+    $("#summaryCard").hidden = $("#viewCard").hidden = true;
+    $("#report").innerHTML = "";
+  }
+}
+
+function runAnalysis(){
+  const st = $("#dataStatus");
+  if (!state.limits){ setStatus(st, "err", "Data loaded, but no limit file is available yet."); return; }
+  const ctx = Checker.prepare(state.limits, state.data);
+  if (!ctx.tempsCan.length){ setStatus(st, "err", "No limits available for this test temperature. Please verify your test data."); return; }
+  if (!ctx.idsCan.length){ setStatus(st, "err", "No limits available for the test IDs in this file. Please verify your test data."); return; }
+  state.ctx = ctx;
+  state.summary = Checker.summarize(ctx);
+  renderSummary();
+  fillSelectors();
+  $("#intro").hidden = true;
+  showView();
+}
+
+// ---- summary ----
+function cellCls(s){ return s === "pass" ? "pass" : s === "fail" ? "fail" : s === "error" ? "err" : "na"; }
+function cellTxt(s){ return s === "na" ? "n/a" : s; }
+function renderSummary(){
+  const ctx = state.ctx;
+  let h = `<table class="t" id="sumT"><thead><tr><th>Test</th>` +
+    ctx.segmentsCan.map(s => `<th>Seg ${esc(s.seg)}<br>${esc(s.temp)}°C</th>`).join("") + `</tr></thead><tbody>`;
+  for (const t of ctx.testnames){
+    h += `<tr><th class="row">${esc(t)}</th>`;
+    for (const s of ctx.segmentsCan){
+      const ev = state.summary[t+"|"+s.seg];
+      h += `<td class="click ${cellCls(ev.status)}" data-t="${esc(t)}" data-s="${esc(s.seg)}" title="${esc(ev.message || "")}">${cellTxt(ev.status)}</td>`;
+    }
+    h += `</tr>`;
+  }
+  $("#summary").innerHTML = h + `</tbody></table>`;
+  $("#summaryCard").hidden = false;
+  $("#summary").onclick = e => {
+    const td = e.target.closest("td.click"); if (!td) return;
+    $("#tempSel").value = td.dataset.s; $("#testSel").value = td.dataset.t; showView();
+    $("#report").scrollIntoView({behavior:"smooth"});
+  };
+}
+
+function fillSelectors(){
+  const ctx = state.ctx, ts = $("#tempSel"), tt = $("#testSel");
+  ts.innerHTML = ""; tt.innerHTML = "";
+  ts.add(new Option("All", "__all"));
+  ctx.segTemp.forEach(s => ts.add(new Option(`Segment ${s.seg} · ${s.temp} °C`, s.seg)));
+  tt.add(new Option("ALL", "__all")); tt.add(new Option("QuickTest", "__quick"));
+  ctx.testnames.forEach(t => tt.add(new Option(t, t)));
+  $("#viewCard").hidden = false;
+}
+$("#showBtn").onclick = () => showView();
+
+// ---- report view ----
+function showView(){
+  const ctx = state.ctx; if (!ctx) return;
+  const segSel = $("#tempSel").value, testSel = $("#testSel").value;
+  const rep = $("#report");
+  let html = `<div class="card meta">
+      <div><span>File</span> <b>${esc(state.fileName)}</b></div>
+      <div><span>Run</span> <b>${esc(ctx.lastRun)}</b>${ctx.runs.length>1?` <span>(last of ${ctx.runs.length})</span>`:""}</div>
+      <div><span>Mother S/N</span> <b>${esc(ctx.info.mother)}</b></div>
+      <div><span>Daughter S/N</span> <b>${esc(ctx.info.daughter)}</b></div>
+      <div><span>Limits</span> <b>${esc(state.limitName)}</b></div>
+    </div>`;
+  const charts = [];
+  if (testSel === "__quick"){
+    html += quickTestHTML(ctx, charts);
+  } else {
+    const segs = segSel === "__all" ? ctx.segTemp.map(s=>s.seg) : [segSel];
+    const tests = testSel === "__all" ? ctx.testnames : [testSel];
+    const evs = [];
+    for (const s of segs) for (const t of tests){
+      const ev = Checker.evaluate(ctx, t, s); evs.push(ev);
+      html += testSectionHTML(ev, charts);
+    }
+    html += resultMatrixHTML(evs, segs, tests);
+    html += failTableHTML(evs);
+  }
+  rep.innerHTML = html;
+  state.charts = charts;
+  charts.forEach(c => drawChart(document.getElementById(c.id), c));
+}
+
+function testSectionHTML(ev, charts){
+  let h = `<div class="card section"><h3>${esc(ev.testname)} <span class="badge ${cellCls(ev.status)}">${cellTxt(ev.status)}</span></h3>
+    <div class="sub">Segment ${esc(ev.seg)} · ${esc(ev.temp)} °C</div>`;
+  if (ev.status === "na" || ev.status === "error") return h + `<div class="status ${ev.status==="error"?"err":"info"}">${esc(ev.message)}</div></div>`;
+  const m = Checker.displayModel(ev);
+  if (!m.rows.length) return h + `<div class="status info">No data rows for this test.</div></div>`;
+  h += `<div class="tw">`;
+  if (m.transpose){
+    h += `<table class="t"><thead><tr><th>${esc(m.refcol)}</th>${m.rows.map(r=>`<th>${esc(r.ref)}</th>`).join("")}</tr></thead><tbody>`;
+    m.cols.forEach((c,ci) => {
+      h += `<tr><th>${esc(c)}</th>` + m.rows.map(r => {
+        const v = r.cells[ci];
+        let cls = "";
+        if (c === "result") cls = v; else if (failedCell(ev, r.refNum, c)) cls = "fail";
+        return `<td class="${cls}">${esc(v)}</td>`;
+      }).join("") + `</tr>`;
+    });
+  } else {
+    h += `<table class="t"><thead><tr><th>${esc(m.refcol)}</th>${m.cols.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>`;
+    for (const r of m.rows) h += `<tr class="${r.result}"><td>${esc(r.ref)}</td>${r.cells.map(v=>`<td>${esc(v)}</td>`).join("")}</tr>`;
+  }
+  h += `</tbody></table></div>`;
+  const cfg = Checker.TESTS[ev.testid];
+  const plotCols = cfg.plot.filter(c => m.cols.includes(c));
+  if (plotCols.length){
+    const id = "ch" + charts.length;
+    const series = plotCols.map((c,i) => ({name:c, color:`var(--s${i+1})`,
+      pts: ev.rows.map(r => [r.v[m.refcol], r.v[c]]).filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1])).sort((a,b)=>a[0]-b[0])}));
+    // limit envelope(s)
+    const lims = [];
+    const byCol = {};
+    for (const c of plotCols){
+      const L = ev.lim.filter(l => l.checkcol === c).sort((a,b)=>a.refvalue-b.refvalue);
+      if (L.length) byCol[c] = L;
+    }
+    const keys = Object.keys(byCol);
+    const same = keys.length > 1 && keys.every(k => JSON.stringify(byCol[k].map(l=>[l.refvalue,l.high,l.low])) === JSON.stringify(byCol[keys[0]].map(l=>[l.refvalue,l.high,l.low])));
+    (same ? [keys[0]] : keys).forEach(k => {
+      const col = same ? "var(--limit)" : series.find(s=>s.name===k).color;
+      const lbl = same ? "limit" : "limit " + k;
+      lims.push({name:lbl+" high", legend:lbl, color:col, dash:true, pts: byCol[k].map(l=>[l.refvalue,l.high])});
+      lims.push({name:lbl+" low", color:col, dash:true, pts: byCol[k].map(l=>[l.refvalue,l.low])});
+    });
+    charts.push({id, title:ev.testname, series:[...series, ...lims], yRange:cfg.yrange, xReverse:cfg.xreverse, xLabel:m.refcol, height:240});
+    h += `<div class="chart" id="${id}"></div>`;
+  }
+  return h + `</div>`;
+}
+function failedCell(ev, ref, col){ return ev.fails && ev.fails.some(f => f.check === col && f.refvalue === ref); }
+
+function resultMatrixHTML(evs, segs, tests){
+  if (evs.length < 2) return "";
+  let h = `<div class="card section"><h3>Overall result</h3><div class="tw"><table class="t"><thead><tr><th>Test</th>` +
+    segs.map(s => `<th>Seg ${esc(s)}</th>`).join("") + `</tr></thead><tbody>`;
+  for (const t of tests){
+    h += `<tr><th style="text-align:left;text-transform:none">${esc(t)}</th>`;
+    for (const s of segs){ const ev = evs.find(e => e.testname===t && e.seg===s); h += `<td class="${cellCls(ev.status)}">${cellTxt(ev.status)}</td>`; }
+    h += `</tr>`;
+  }
+  return h + `</tbody></table></div></div>`;
+}
+
+function failTableHTML(evs){
+  const rows = [];
+  for (const ev of evs) for (const f of (ev.fails||[])) rows.push({ev, f});
+  if (!rows.length) return "";
+  let h = `<div class="card section"><h3>Fail data <span class="badge fail">${rows.length}</span></h3><div class="tw"><table class="t"><thead><tr>
+    <th>Segment</th><th>Temp °C</th><th>Test</th><th>Check</th><th>Reference</th><th>Low</th><th>Measured</th><th>High</th></tr></thead><tbody>`;
+  for (const {ev,f} of rows)
+    h += `<tr class="fail"><td>${esc(ev.seg)}</td><td>${esc(ev.temp)}</td><td>${esc(ev.testname)}</td><td>${esc(f.check)}</td>
+      <td>${esc(f.refcol)} = ${esc(f.refvalue)}</td><td>${fmt(f.low)}</td><td>${Number.isFinite(f.value)?fmt(f.value):"missing"}</td><td>${fmt(f.high)}</td></tr>`;
+  return h + `</tbody></table></div><div class="muted" style="font-size:11px;margin-top:4px">A value passes when Low &lt; Measured ≤ High.</div></div>`;
+}
+
+// ---- quick test: split into three single-axis charts ----
+function quickTestHTML(ctx, charts){
+  const q = ctx.run.filter(r => r.v.testtype === 1 && r.v.testid === 1);
+  if (!q.length) return `<div class="card"><div class="status info">No quick test data (TestType 1, TestID 1) in this run.</div></div>`;
+  const mk = (cols) => cols.map((c,i) => ({name:c, color:`var(--s${i+1})`,
+    pts: q.map(r => [r.v.els, r.v[c]]).filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]))}));
+  const groups = [
+    {title:"Temperature (°C)", series: mk(["oventemp","tooltemp"])},
+    {title:"Sub-bus current (mA)", series: mk(["subbusi"])},
+    {title:"Voltages (V)", series: mk(["subbusv","11v","6.8v","dac_0.0v","dac_1.4v","dac_2.2v","dac_2.8v","dac_4.3v"]), yRange:[0,21]},
+  ];
+  let h = `<div class="card section"><h3>Quick test</h3><div class="sub">${q.length} points, all segments of run ${esc(ctx.lastRun)}, plotted against ELS</div><div class="charts2">`;
+  groups.forEach((g,i) => {
+    const id = "qt" + i;
+    charts.push({id, title:g.title, series:g.series, yRange:g.yRange||[], xLabel:"ELS", height: i===2 ? 300 : 220, markers:false});
+    h += `<div class="chart" id="${id}" style="${i===2?"grid-column:1/-1":""}"></div>`;
+  });
+  return h + `</div></div>`;
+}
+
+// ---- SVG line chart ----
+function niceTicks(min, max, n=6){
+  if (min === max){ min -= 1; max += 1; }
+  const span = max - min, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1,2,2.5,5,10].map(m=>m*mag).find(s => span/s <= n) || 10*mag;
+  const t = []; for (let v = Math.ceil(min/step)*step; v <= max + step*1e-9; v += step) t.push(+v.toFixed(10));
+  return t;
+}
+function tickLabel(v){
+  const a = Math.abs(v);
+  if (a >= 1e6) return +(v/1e6).toFixed(4) + "M";
+  if (a >= 1e4) return +(v/1e3).toFixed(3) + "k";
+  return String(+v.toFixed(4));
+}
+function drawChart(host, cfg){
+  if (!host) return;
+  const cs = getComputedStyle(document.documentElement);
+  const resolve = c => c.startsWith("var(") ? cs.getPropertyValue(c.slice(4,-1)).trim() : c;
+  const W = Math.max(320, host.clientWidth || 700), H = cfg.height || 240;
+  const m = {l:52, r:14, t:22, b:34};
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const all = cfg.series.flatMap(s => s.pts);
+  if (!all.length){ host.innerHTML = `<div class="muted">Nothing to plot.</div>`; return; }
+  let [x0,x1] = [Math.min(...all.map(p=>p[0])), Math.max(...all.map(p=>p[0]))];
+  let y0, y1;
+  if (cfg.yRange && cfg.yRange.length === 2) [y0,y1] = cfg.yRange;
+  else { y0 = Math.min(...all.map(p=>p[1])); y1 = Math.max(...all.map(p=>p[1])); const pad=(y1-y0||1)*0.08; y0-=pad; y1+=pad; }
+  if (x0 === x1){ x0 -= 1; x1 += 1; }
+  const X = v => m.l + (cfg.xReverse ? (x1 - v) : (v - x0)) / (x1 - x0) * pw;
+  const Y = v => m.t + (y1 - v) / (y1 - y0) * ph;
+  const clipId = host.id + "_clip";
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(cfg.title)}"><defs><clipPath id="${clipId}"><rect x="${m.l}" y="${m.t}" width="${pw}" height="${ph}"/></clipPath></defs>`;
+  s += `<text class="title" x="${m.l}" y="14">${esc(cfg.title)}</text>`;
+  const yt = niceTicks(y0, y1, Math.max(3, Math.floor(ph/40))), xt = niceTicks(x0, x1, Math.max(3, Math.floor(pw/80)));
+  const grid = resolve("var(--grid)"), axis = resolve("var(--axis)");
+  for (const v of yt) if (v >= y0 && v <= y1) s += `<line x1="${m.l}" x2="${m.l+pw}" y1="${Y(v)}" y2="${Y(v)}" stroke="${grid}"/><text x="${m.l-6}" y="${Y(v)+4}" text-anchor="end">${tickLabel(v)}</text>`;
+  for (const v of xt) if (v >= x0 && v <= x1) s += `<line x1="${X(v)}" x2="${X(v)}" y1="${m.t}" y2="${m.t+ph}" stroke="${grid}"/><text x="${X(v)}" y="${m.t+ph+14}" text-anchor="middle">${tickLabel(v)}</text>`;
+  s += `<rect x="${m.l}" y="${m.t}" width="${pw}" height="${ph}" fill="none" stroke="${axis}"/>`;
+  s += `<text x="${m.l+pw/2}" y="${H-4}" text-anchor="middle">${esc(cfg.xLabel||"")}${cfg.xReverse?" (reversed)":""}</text>`;
+  s += `<g clip-path="url(#${clipId})">`;
+  for (const se of cfg.series){
+    const col = resolve(se.color);
+    const d = se.pts.map((p,i) => (i?"L":"M") + X(p[0]).toFixed(1) + "," + Y(p[1]).toFixed(1)).join("");
+    s += `<path d="${d}" fill="none" stroke="${col}" stroke-width="${se.dash?1.5:2}" ${se.dash?'stroke-dasharray="5 4"':""} stroke-linejoin="round"/>`;
+    if (!se.dash && cfg.markers !== false && se.pts.length <= 60)
+      for (const p of se.pts) s += `<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="2.5" fill="${col}"/>`;
+  }
+  s += `</g><line class="xh" x1="0" x2="0" y1="${m.t}" y2="${m.t+ph}" stroke="${axis}" stroke-dasharray="3 3" visibility="hidden"/>`;
+  s += `<rect class="hit" x="${m.l}" y="${m.t}" width="${pw}" height="${ph}" fill="transparent"/></svg>`;
+  const leg = cfg.series.filter(se => !se.dash || se.legend).map(se => `<span><i class="${se.dash?"dash":""}" style="border-color:${resolve(se.color)}"></i>${esc(se.legend||se.name)}</span>`).join("");
+  host.innerHTML = s + `<div class="legend">${leg}</div><div class="tip"></div>`;
+  // hover crosshair + tooltip
+  const svg = host.querySelector("svg"), tip = host.querySelector(".tip"), xh = svg.querySelector(".xh");
+  const xs = [...new Set(cfg.series.filter(se=>!se.dash).flatMap(se => se.pts.map(p=>p[0])))].sort((a,b)=>a-b);
+  svg.querySelector(".hit").addEventListener("mousemove", ev => {
+    const r = svg.getBoundingClientRect(), sx = (ev.clientX - r.left) * W / r.width;
+    let best = xs[0], bd = Infinity; for (const x of xs){ const d = Math.abs(X(x) - sx); if (d < bd){ bd = d; best = x; } }
+    xh.setAttribute("x1", X(best)); xh.setAttribute("x2", X(best)); xh.setAttribute("visibility", "visible");
+    let t = `<b>${esc(cfg.xLabel)} ${tickLabel(best)}</b>`;
+    for (const se of cfg.series){ const p = se.pts.find(p => p[0] === best); if (p) t += `<br><span class="sw" style="background:${resolve(se.color)}"></span>${esc(se.name)}: ${fmt(p[1])}`; }
+    tip.innerHTML = t; tip.style.display = "block";
+    const px = X(best) * r.width / W;
+    tip.style.left = (px + 12 + tip.offsetWidth > r.width ? px - tip.offsetWidth - 12 : px + 12) + "px";
+    tip.style.top = "24px";
+  });
+  svg.querySelector(".hit").addEventListener("mouseleave", () => { tip.style.display = "none"; xh.setAttribute("visibility","hidden"); });
+}
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => (state.charts||[]).forEach(c => drawChart(document.getElementById(c.id), c)), 200); });
+
+$("#sampleBtn").onclick = async () => {
+  try {
+    const r = await fetch("sample_data.csv"); if (!r.ok) throw new Error("HTTP " + r.status);
+    readData(new File([await r.text()], "sample_data.csv"));
+  } catch(e){ setStatus($("#dataStatus"), "err", "Couldn't load the sample (" + esc(e.message) + "). Use the download link instead."); }
+};
+
+// ---- installable web app ----
+let deferredInstall = null;
+addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferredInstall = e; $("#installBtn").hidden = false; });
+$("#installBtn").onclick = async () => { if (!deferredInstall) return; deferredInstall.prompt(); await deferredInstall.userChoice; deferredInstall = null; $("#installBtn").hidden = true; };
+addEventListener("appinstalled", () => { $("#installBtn").hidden = true; });
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});
+
+loadRemoteLimits(Checker.LIMIT_FILES[0].file);
+})();
+</script>
+</body>
+</html>
